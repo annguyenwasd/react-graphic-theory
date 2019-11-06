@@ -1,24 +1,27 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { useEffect, useRef, useState } from 'react';
+import p5 from 'p5';
+import sketch from 'p5-ish/sketch';
+import { tools } from 'const';
 
 function App() {
+  const canvasContainer = useRef(null);
+  const [canvas, setCanvas] = useState({});
+
+  useEffect(() => {
+    const c = new p5(sketch, canvasContainer.current);
+    setCanvas(c);
+  }, []);
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <button onClick={() => canvas.setTool(tools.VERTEX)}>vertex</button>
+      <button onClick={() => canvas.setTool(tools.UNDIRECTIONAL)}>
+        undirectional
+      </button>
+      <button onClick={() => canvas.setTool(tools.DIRECTIONAL)}>
+        directional
+      </button>
+      <button onClick={() => canvas.setTool(tools.LOOP)}>loop</button>
+      <div ref={canvasContainer}></div>
     </div>
   );
 }
