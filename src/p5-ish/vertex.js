@@ -4,6 +4,7 @@ export default class Vertex {
   r = 10;
   isActive = false;
   isDragged = false;
+
   constructor(x, y, name, sketch) {
     this.sketch = sketch;
     this.x = x;
@@ -11,29 +12,36 @@ export default class Vertex {
     this.name = name;
   }
 
-  render() {
+  render(needCursor) {
+    this.renderName();
+    this.renderPoint();
+  }
+
+  renderPoint() {
+    this.sketch.push();
+    this.sketch.stroke(this.isActive ? colors.selected : colors.white);
+    this.sketch.strokeWeight(this.r);
+    this.sketch.point(this.x, this.y);
+    this.sketch.pop();
+  }
+
+  renderName() {
+    this.sketch.push();
     this.sketch.fill(255);
-    this.sketch.noStroke();
-    if (this.isActive) {
-      this.sketch.fill(colors.selected);
-    }
-    this.sketch.circle(this.x, this.y, this.r);
     this.sketch.textSize(16);
     this.sketch.text(this.name, ...this.getTextPosition());
-    if (this.intersect(this.sketch.mouseX, this.sketch.mouseY)) {
-      this.sketch.cursor(this.sketch.HAND);
-    }
+    this.sketch.pop();
   }
 
   onClick(cb) {
-    if (this.intersect(this.sketch.mouseX, this.sketch.mouseY)) {
+    if (this.intersect()) {
       this.setActive(!this.isActive);
       cb(this);
     }
   }
 
   move() {
-    if (this.intersect(this.sketch.mouseX, this.sketch.mouseY)) {
+    if (this.intersect()) {
       this.isDragged = true;
     }
 
@@ -60,7 +68,7 @@ export default class Vertex {
     return this.y;
   }
 
-  intersect(mx, my) {
+  intersect(mx = this.sketch.mouseX, my = this.sketch.mouseY) {
     return this.sketch.dist(this.x, this.y, mx, my) <= this.r;
   }
 

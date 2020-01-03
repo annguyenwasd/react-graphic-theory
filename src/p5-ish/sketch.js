@@ -1,6 +1,7 @@
 import { tools, graphType } from 'const';
 import Edge from 'p5-ish/edge';
 import Vertex from 'p5-ish/vertex';
+import { colors } from 'const';
 
 export default function(sketch) {
   let vCount = 0;
@@ -8,81 +9,107 @@ export default function(sketch) {
   let edges = [];
   let selectedVerties = [];
   let tool = null;
-  let clickSource = null;
+  let dragging = false;
 
   /** s short for sketch */
   sketch.setup = function() {
     sketch.createCanvas(sketch.windowWidth, sketch.windowHeight);
+
+    // add random verties
+    for (let i = 0; i < 10; i++) {
+      verties.push(
+        new Vertex(
+          sketch.random(0, 500),
+          sketch.random(0, 600),
+          `v${vCount++}`,
+          sketch
+        )
+      );
+    }
   };
 
   sketch.draw = function() {
+    sketch.push();
     sketch.background(51);
     verties.forEach(vertex => vertex.render());
     edges.forEach(edge => edge.render());
-    drawVertex();
+    renderToolCursor();
+    if (!dragging && !tool) {
+      sketch.cursor(verties.some(v => v.intersect()) ? 'grab' : sketch.ARROW);
+    }
+    sketch.pop();
   };
 
   sketch.mousePressed = function() {
-    onVertiesClick();
-
-    switch (tool) {
-      case tools.VERTEX:
-        if (!clickSource)
-          verties.push(
-            new Vertex(sketch.mouseX, sketch.mouseY, `v${vCount++}`, sketch)
-          );
-        break;
-      case tools.UNDIRECTIONAL:
-        createUndirectionalEdge();
-        break;
-      case tools.LOOP:
-        createLoopEdge();
-        break;
-      default:
-        break;
-    }
-
-    // refresh
-    clickSource = null;
+    handleVertexClick();
+    handleToolAction();
   };
 
   sketch.mouseDragged = function() {
     const canDragVertex = !tool && selectedVerties[0];
+    dragging = true;
     if (canDragVertex) {
+      sketch.cursor('grabbing');
       selectedVerties[0].move();
     }
   };
 
   sketch.mouseReleased = function() {
-    const canReleaseVertex = !tool && selectedVerties[0];
+    dragging = false;
+    const v = selectedVerties[0];
+    const canReleaseVertex = !tool && v;
     if (canReleaseVertex) {
-      selectedVerties[0].stop();
+      v.stop();
+      v.setActive(false);
+      selectedVerties.length = 0;
     }
   };
 
   sketch.keyPressed = function() {
     handleDeleteVertex();
     handleDeselectTool();
+    handleDeselectVerties();
   };
 
-  sketch.addVerties = function(amount) {
-    Array.from({ length: amount }).forEach(() => {
-      verties.push(
-        new Vertex(sketch.random(0, 500), sketch.random(0, 500), 'abc', sketch)
-      );
-    });
-  };
-
-  function drawVertex() {
-    if (tool === tools.VERTEX) {
-      sketch.noFill();
-      sketch.stroke(255);
-      sketch.circle(sketch.mouseX, sketch.mouseY, 10);
-      sketch.cursor('copy');
+  function renderToolCursor() {
+    if (dragging || !tool) return;
+    sketch.push();
+    switch (tool) {
+      case tools.VERTEX:
+        sketch.noFill();
+        sketch.stroke(255);
+        sketch.strokeWeight(10);
+        sketch.point(sketch.mouseX, sketch.mouseY);
+        sketch.cursor('copy');
+        break;
+      case tools.DIRECTIONAL:
+        sketch.cursor('se-resize');
+        if (selectedVerties.length === 1) {
+          drawEdgePlaceholder();
+        }
+        break;
+      case tools.UNDIRECTIONAL:
+        sketch.cursor('ew-resize');
+        if (selectedVerties.length === 1) {
+          drawEdgePlaceholder();
+        }
+        break;
+      default:
+        sketch.cursor(sketch.ARROW);
+        break;
     }
+
+    sketch.pop();
   }
 
-  function onVertiesClick() {
+  function drawEdgePlaceholder() {
+    const v = selectedVerties[0];
+    sketch.stroke(255, 255, 255, 200);
+    sketch.strokeWeight(3);
+    sketch.line(v.getX(), v.getY(), sketch.mouseX, sketch.mouseY);
+  }
+
+  function handleVertexClick() {
     verties.forEach(vertex =>
       vertex.onClick(() => {
         // if no tool selected => select 1 vertex at a time
@@ -94,30 +121,43 @@ export default function(sketch) {
           if (!selectedVerties.includes(vertex)) {
             selectedVerties.push(vertex);
           } else {
-            const index = selectedVerties.findIndex(
-              v => v.x === vertex.x && v.y === vertex.y
-            );
             vertex.setActive(false);
-            selectedVerties.splice(index, 1);
+            selectedVerties = selectedVerties.filter(v => v.name !== vertex);
           }
         }
       })
     );
   }
 
-  function createUndirectionalEdge() {
+  function handleToolAction() {
+    switch (tool) {
+      case tools.VERTEX:
+        verties.push(
+          new Vertex(sketch.mouseX, sketch.mouseY, `v${vCount++}`, sketch)
+        );
+        break;
+      case tools.DIRECTIONAL:
+        createLineEdge(graphType.DIRECTIONAL);
+        break;
+      case tools.UNDIRECTIONAL:
+        createLineEdge(graphType.UNDIRECTIONAL);
+        break;
+      case tools.LOOP:
+        createLoopEdge();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function createLineEdge(type) {
     if (selectedVerties.length === 2) {
       edges.push(
-        new Edge(
-          selectedVerties[0],
-          selectedVerties[1],
-          graphType.UNDIRECTIONAL,
-          sketch
-        )
+        new Edge(selectedVerties[0], selectedVerties[1], type, sketch)
       );
       selectedVerties.forEach(point => point.setActive(false));
       // empty after create Edge
-      selectedVerties = [];
+      selectedVerties.length = 0;
     }
   }
 
@@ -126,7 +166,7 @@ export default function(sketch) {
       edges.push(
         new Edge(selectedVerties[0], selectedVerties[0], graphType.LOOP, sketch)
       );
-      selectedVerties = [];
+      selectedVerties.length = 0;
     }
   }
 
@@ -148,6 +188,13 @@ export default function(sketch) {
     }
   }
 
+  function handleDeselectVerties() {
+    if (sketch.keyCode === sketch.ESCAPE) {
+      verties.forEach(v => v.setActive(false));
+      selectedVerties.length = 0;
+    }
+  }
+
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
@@ -155,5 +202,8 @@ export default function(sketch) {
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
 
-  sketch.setTool = tooName => (tool = tooName);
+  sketch.setTool = tooName => {
+    tool = tooName;
+    selectedVerties.length = 0;
+  };
 }
